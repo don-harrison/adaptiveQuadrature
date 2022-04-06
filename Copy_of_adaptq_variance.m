@@ -6,7 +6,7 @@
 %can we use variance on the samples weve collected to make better
 %predictions for step size?
 
-function R = adaptq_basic(f, a, b, tau)
+function R = adaptq_variance(f, a, b, tau)
 %model after the stepwise midpoint/trapezoidal method
 %Move from a to b in steps.
 %At each step approximate the integral over
@@ -30,13 +30,15 @@ function R = adaptq_basic(f, a, b, tau)
     RES=0;
     previousStep = a;
     safety = .95;
-    
+    A = [];
     %choose h to be small
     h = .0001;
     test=1;
     while(true)
+        %set values
         total = total + 1;
         currentStep = previousStep + h;
+        A(end+1) = f(currentStep);
 
         if (previousStep == b) 
             R=RES;
@@ -44,13 +46,16 @@ function R = adaptq_basic(f, a, b, tau)
             disp("succesful Loops: " + n);
             return;
         end
-
+        
         %dont overshoot
         if (currentStep > b)
             h = b - previousStep;
             currentStep = b;
         end
-        
+        %calculate variance so far and decide what to do
+        variance = var(A);
+        disp(variance);
+
         %calculate step error
         M_n = midpoint(f, previousStep, currentStep, h);
         T_n = trapezoidal(f, previousStep, currentStep, h);
@@ -59,13 +64,33 @@ function R = adaptq_basic(f, a, b, tau)
         e_des = abs((h * tau)/(b-a));
 
         %h = safety * sqrt(abs(3*tau*(h^3))/(b-a) * (T_n * M_n));
+        %FAILED STEP
         if (e_est > e_des)
+            if(variance > 1)
+                safety = 1/variance;
+            end
             h = safety * h * sqrt(double(e_des)/double(e_est));
             continue;
         end
+        %SUCCESFUL STEP
+            M = containers.Map();
             n = n + 1;
             RES = RES + M_n;
             previousStep = currentStep;
             test = test + 1;
     end
+end
+
+% TRAPEZOIDAL
+%
+% apply the trapezoidal rule. Use as trapezoidal(f,a,b,n)
+function T = trapezoidal(f, currentStep, previousStep, h)
+    T = (h/2)*(f(previousStep)+f(currentStep));
+end
+
+% MIDPOINT
+%
+% apply the midpoint rule. Use as midpoint(f,a,b,n)
+function M = midpoint(f, currentStep, previousStep, h)
+    M = h*f((previousStep + currentStep)/2);
 end
